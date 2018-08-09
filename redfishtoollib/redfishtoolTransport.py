@@ -6,7 +6,7 @@
 # v0.9.3
 # Contents:
 # 1. Class RfSessionAuth --  holds auto-created session Auth info.  'requests' calls to get credentials
-# 2. Class RfTransport -- has the generic functions to send/receive http requests, generic print functions, etc  
+# 2. Class RfTransport -- has the generic functions to send/receive http requests, generic print functions, etc
 #  - transport object variables used to pass transport parameters from main to cmdTable and subcommand objects
 #  - getApiScheme function -- generates proper scheme (http|https) based on input options and type of API
 #  - getVersionAndSetRootPath  function -- executes GET /redfish with optional retry loop to negotiate protocol ver
@@ -103,19 +103,19 @@ class RfTransport():
         self.gotMatchOptn=False
         self.matchProp=None
         self.matchValue=None
-        
+
         self.IdLevel2=None
         self.gotIdLevel2Optn=False
         self.IdLevel2OptnCount=0
-        
+
         self.gotMatchLevel2Optn=False
         self.matchLevel2Prop=None
         self.matchLevel2Value=None
 
         self.linkLevel2=None  # -l <link> or --link=<link>
-        
+
         self.Link=None   # -L <Link> or --Link=<link>
-        self.configFile=""      
+        self.configFile=""
         self.secure="IfLoginOrAuthenticatedApi" #Never
         self.waitTime=3
         self.waitNum=1
@@ -132,7 +132,7 @@ class RfTransport():
         self.rootResponseDict=None
         self.rhostSupportedVersions=None
         self.versionToUse=None
-        
+
         # API parameters that are calculated for each (multiple) API call used to execute the cmd
         self.scheme=None   #not used any longer
         self.scheme0=None  #not used any longer
@@ -150,7 +150,7 @@ class RfTransport():
 
         requests.packages.urllib3.disable_warnings()
 
-             
+
     # calculate the user-specified minimum security scheme based on APItype and --Secure options
     # usage:    userSpecifiedScheme=rft.getApiScheme(apiType)
     # self.secureValidValues=["IfSendingCredentials", "IfLoginOrAuthenticatedApi", "Always", "Never"]
@@ -161,11 +161,11 @@ class RfTransport():
         elif( self.secure == "Never" ):
             scheme="http"
         elif( (self.secure == "IfSendingCredentials") and
-            (   (apiTypeIn==self.AUTHENTICATED_WITH_CREDENTIALS_API) or 
+            (   (apiTypeIn==self.AUTHENTICATED_WITH_CREDENTIALS_API) or
                 (apiTypeIn==self.UNAUTHENTICATED_WITH_CREDENTIALS_API) or
                 ( (apiTypeIn==self.AUTHENTICATED_API) and (self.auth == "Basic") ) ) ):
             scheme="https"
-        elif( (self.secure=="IfLoginOrAuthenticatedApi") and 
+        elif( (self.secure=="IfLoginOrAuthenticatedApi") and
             (   (apiTypeIn==self.AUTHENTICATED_API) or
                 (apiTypeIn==self.UNAUTHENTICATED_WITH_CREDENTIALS_API)  )):
                 scheme="https"
@@ -173,7 +173,7 @@ class RfTransport():
             scheme="http"
             #print("else HTTP dflt")
         return(scheme)  #return ok
-            
+
     def getVersionsAndSetRootPath(self,rft,forceCheckProtocolVer=False):
         # Read the Redfish Versions API (/redfish) to determine which protocol versions the service supports
         # The proper ServiceRoot Path returned for each protocol version eg:  { "v1": "/redfish/v1" }.
@@ -229,7 +229,7 @@ class RfTransport():
 
         scheme_tuple=[scheme, rft.rhost, "/redfish", "","",""]
         url=urlunparse(scheme_tuple)                # url= "http[s]://<rhost>[:<port>]/redfish"
-        
+
         rft.printVerbose(5,"Transport.getRootPath: url={}".format(url))
 
         # now send request to rhost, with retries based on -W <waitNum>:<waitTime> option.
@@ -269,17 +269,17 @@ class RfTransport():
                 # otherl requests exceptions.  return with error
                 rft.printErr("Transport: Fatal exception trying to connect to rhost. Error:{}".format(e))
                 return(5,None,False,None)
-            
+
             else:  # if no exception
                 #print the response status (-ssss)
                 rft.printStatus(4,r=r,authMsg=None)
                 rft.printStatus(5,r=r,authMsg=None)
-                
+
                 if( r.status_code==requests.codes.ok):
                     success=True
                     break
 
-                
+
         if not success:   # retries were exceeded w/o success
             rft.printErr("Transport: Cant connect to remote redfish service. Aborting command")
             if( (r is not None) and ( r.status_code >= 400 )):
@@ -287,13 +287,13 @@ class RfTransport():
             else:
                 rft.printErr("Transport Error. No response")
             return(5,None,False,None)
-        
+
         #print the response status (-ssss)
         rft.printStatus(4,r=r)
-        
+
         # if here, r is the response to the GET /redfish  request
         rft.printVerbose(5,"Transport: getVersionsAndRootPath: Get /redfish: statusCode: {}".format(r.status_code))
-            
+
         # load it into a python dictionary
         try:
             rft.rhostVersions=json.loads(r.text)
@@ -308,12 +308,12 @@ class RfTransport():
         # now determine the right protocol to use based on -P protocolVer option (default=Latest), the versions that
         #   the remote service supports, and the versions that this program supports.
         rfVer=None  # rfVer holds the version we select.  It will be a string eg "v1"
-        
+
         # first calculate the version to use for the default "-P Latest" option setting--means "use the latest common protocol ver"
         if(rft.protocolVer=="Latest"):
             #reverse sort the supportedVersions list for this program (latest means highest first in list
             reverseSortedRftVersions=list(rft.supportedVersions)  # make a copy of the list. this list looks like ["v1","v2"...]
-            
+
             # now reverse sort it based on the number (the 1 in v1).  the result looks like ["v2", "v1", ...]
             reverseSortedRftVersions.sort(key=lambda x: int(x[1:]),reverse=True)  # reverse sort it based on number (the 1 in v1)
             #print("rf",reverseSortedRftVersions)
@@ -371,7 +371,7 @@ class RfTransport():
     #       rc,r,j,d =(returnCode(int: 0=ok), RequestsResponse, jsonData(True/False), data (type: None|dict|text))
     # Syntax:  rc,r,j,d = rftSendRecvRequest( apiType, method, baseUrl, relPath=None, jsonData=True,  prop=None,
     #                                     collection=False, loadData=True, redirect=True, data=None (inputdata),
-    #                                     getEtagFirst=False (for patches, get etag from rhost 1st),**kwargs)                                 
+    #                                     getEtagFirst=False (for patches, get etag from rhost 1st),**kwargs)
     # todo:
     # 1.  exception handling on urlparse, urlunparse, urljoin
 
@@ -400,13 +400,13 @@ class RfTransport():
         # now unparse the api with most secure scheme
         scheme_tuple=[scheme, urlp.netloc, urlp.path, "","",""]
         urlBase2=urlunparse(scheme_tuple)
-        
+
         #join the baseURL and relative path passed in
         #  note that if no relPath was specified, it defaults to None, which joins nothing to base URL
         # this re-joining logic makes redfishtool correctly follow normal relative URL rules.
         # although redfish does not allow local relative paths, redfishtool will work if they were implemented
         url=urljoin(urlBase2,relPath)
-        
+
         #define headers.
         # the transport will use defaults specified in the Transport defaults properties dfltXYZHdrs depending on method XYZ.
         # if headers were passed in by a command function in property headersInput, then add them or modify default with those values
@@ -429,17 +429,17 @@ class RfTransport():
         if( headersInput is not None):  # headers passed in from a calling function overrides defaults
             for key in headersInput:
                 hdrs[key]=headersInput[key]
-            
+
         # check and see if an additional/alternate hdr value was passed in on CLI as -H option
         if( rft.headers is not None):
             # a user passed-in an addl header using -H {A:B, C:D},
             # This changes the current value or adds the new header if it doesn't already exist
             for key in rft.headers:
                 hdrs[key]=rft.headers[key]
-                           
+
         #print("hdrs:{}".format(hdrs))
         hdrs['Accept-Encoding']=None
-                
+
         #calculate the authentication method
         authType=None
         authMsg=None
@@ -450,7 +450,7 @@ class RfTransport():
             authenticatedApi=False
         elif( (apiType==rft.AUTHENTICATED_API) or (apiType==rft.AUTHENTICATED_WITH_CREDENTIALS_API)):
             authenticatedApi=True
-            
+
         if( (authenticatedApi is False) or (rft.auth=="None") ):
             authType=None
             authMsg=None
@@ -469,7 +469,7 @@ class RfTransport():
         else:  # unknown auth type or API
             rft.printErr("Transport: Invalid auth type specified, aborting command")
             return(4,None,False,None)
-        
+
         # now send request to rhost, with retries based on -W <waitNum>:<waitTime> option.
         # handle exceptions including timeouts.
         success=None
@@ -518,7 +518,7 @@ class RfTransport():
                 rft.printStatus(4,r=r,authMsg=authMsg)
                 rft.printStatus(5,r=r,authMsg=authMsg)
                 #rft.printStatus(5,data=r.text)  # print the response data (-ssssss)
-                
+
                 if( r.status_code >= 400):
                     rft.printStatusErr4xx(r.status_code)
                     return(5,r,False,None)
@@ -532,7 +532,7 @@ class RfTransport():
                 elif( (r.status_code==200) and (method=="HEAD") ):
                     success=True
                     return(rc,r,False,None)
-                elif((r.status_code==200) or (r.status_code==201) ):  
+                elif((r.status_code==200) or (r.status_code==201) ):
                     if( jsonData is True):
                         try:
                             d=json.loads(r.text)
@@ -559,11 +559,11 @@ class RfTransport():
                         respd=d
                         url=urljoin(urlBase2,d["Members@odata.nextLink"])
                         #dont return--keep looping
-                    elif( not respd is None )and ("Members@odata.nextLink" in d):
+                    elif( not respd is None )and ("Members@odata.nextLink" in d and attempt < rft.MaxNextLinks - 1):
                         # this is 2nd or later response-that has a nextlink
                         respd["Members"]= respd["Members"] + d["Members"]
                         url=urljoin(urlBase2,d["Members@odata.nextLink"])
-                    elif( not respd is None )and (not "Members@odata.nextLink" in d):
+                    elif( not respd is None ):
                         # this final response to a multi-response request, and it has not nextlink
                         respd["Members"]= respd["Members"] + d["Members"]
                         return(rc,r,jsonData,respd)
@@ -571,6 +571,9 @@ class RfTransport():
                     success=False
                     rft.printErr("Transport: processing response status codes")
                     return(5,r,False,None)
+        # Fallback
+        rft.printErr("Transport: Unusual termination")
+        return(5,r,False,None)
 
 
 
@@ -583,7 +586,7 @@ class RfTransport():
         return(0,r,True,propDict)
 
 
-        
+
     #  function to return service versions from GET /redfish as a python Dictionary
     #  returns (rc, rhostVersions) to lib main
     #  returns (rc) to CLI main
@@ -599,14 +602,14 @@ class RfTransport():
         # note that getVersionAndSetRootPath() returns the versions data as d,
         #  so there is no need to call GET /redfish again.  we have it at rft.versionsDict
         #  So just return it with the response
-      
+
         # create the addlData dict:
         rft.printVerbose(2,"Additional Data:",skip1=True)
         rft.printVerbose(2,"   redfishtool Supported Redfish Protocol Versions: {}".format(rft.supportedVersions))
         rft.printVerbose(2,"   rhost       Supported Redfish Protocol Versions: {}".format(rft.rhostSupportedVersions))
         rft.printVerbose(2,"   negotiated  protocol version to use:             {}".format(rft.versionToUse))
         rft.printVerbose(2,"   rootServicePath:                                 {}".format(rft.rootPath))
-            
+
         # some command debug
         rft.printVerbose(4,"Transport:getVersions: got serviceVersions and root path")
 
@@ -633,7 +636,7 @@ class RfTransport():
             if(rc!=0):
                 rft.printErr("Error: SessionLogin: could not read service root")
                 return(rc,None,False,None)
-            
+
         if( ("Links" in d) and ("Sessions" in d["Links"]) and ("@odata.id" in d["Links"]["Sessions"]) ):
             loginUri=rft.rootResponseDict["Links"]["Sessions"]["@odata.id"]
             #print("loginUri:{}".format(loginUri))
@@ -673,13 +676,13 @@ class RfTransport():
             return(4,None,False,None)
         rft.sessionLink=r.headers["Location"]
         rft.cleanupOnExit=cleanupOnExit
-        
+
         rft.printStatus(3,r=r,addSessionLoginInfo=True)
 
         return(rc,r,j,d)
-    
 
-    
+
+
     def rfSessionDelete(self,rft,cmdTop=False,sessionLink=None):
         rft.printVerbose(4,"Transport: in Session Delete (Logout)")
 
@@ -690,7 +693,7 @@ class RfTransport():
             self.printVerbose(5,"rfSessionDelete: deleting session:{}".format(rft.sessionId))
             rft.printVerbose(4,"Transport: delete session: id:{},  link:{}".format(rft.sessionId, rft.sessionLink))
             sessionLink=rft.sessionLink
-            
+
         # now we have a login uri,  login
         # POST the user credentials to the login URI, and read the SessionLink and SessionAuthToken from header
         rc,r,j,d=rft.rftSendRecvRequest(rft.AUTHENTICATED_API, 'DELETE', rft.rootUri, relPath=sessionLink)
@@ -705,8 +708,8 @@ class RfTransport():
         rc=0
         return(rc,r,False,None)
 
-    
-    def rfCleanup(self,rft):       
+
+    def rfCleanup(self,rft):
         #if we created a temp session in this cmd, logout
         self.printVerbose(5,"rfCleanup:Cleaningup session: {}".format(self.sessionId))
         if((rft.cleanupOnExit is True ) and (rft.sessionId is not None) ):
@@ -719,7 +722,7 @@ class RfTransport():
          return(0)
 
 
-    def printVerbose(self,v,*argv, skip1=False, printV12=True,**kwargs): 
+    def printVerbose(self,v,*argv, skip1=False, printV12=True,**kwargs):
         if(self.quiet):
             return(0)
         if( (v==1 or v==2) and (printV12 is True) and (self.verbose >= v )):
@@ -727,7 +730,7 @@ class RfTransport():
             print("#",*argv, **kwargs)
         elif( (v==1 or v==2) and (self.verbose >4 )):
             if(skip1 is True):  print("#")
-            print("#",*argv, **kwargs)            
+            print("#",*argv, **kwargs)
         elif((v==3 ) and (printV12 is True) and (self.verbose >=v)):
             if(skip1 is True):  print("#")
             print("#REQUEST:",*argv,file=sys.stdout,**kwargs)
@@ -744,7 +747,7 @@ class RfTransport():
         #if you set v= anything except 0,1,2,3,4,5 it is ignored
 
 
-    def printStatus(self, s, r=None, hdrs=None, authMsg=None, addSessionLoginInfo=False): 
+    def printStatus(self, s, r=None, hdrs=None, authMsg=None, addSessionLoginInfo=False):
         if(self.quiet):
             return(0)
         if(   (s==1 ) and (self.status >= s ) and (r is not None) ):
@@ -772,7 +775,7 @@ class RfTransport():
             pass
             #if you set v= anything except 1,2,3,4,5 it is ignored
         sys.stdout.flush()
-        
+
 
 
 
@@ -784,7 +787,7 @@ class RfTransport():
                 print(prepend,"  {}:".format(self.program),*argv, file=sys.stderr, **kwargs)
         else:
             pass
-        
+
         sys.stderr.flush()
         return(0)
 
@@ -840,7 +843,7 @@ class RfTransport():
             else:
                 errMsg=""
             self.printErr("Transport: Response Error: status_code: {} -- {}".format(status_code, errMsg ))
-            
+
         sys.stdout.flush()
         return(0)
 
@@ -855,7 +858,7 @@ class RfTransport():
             if( numOfLinks == 0 ):
                 rft.printErr("Error: getPathBy: empty members array")
                 return(None,1,None,False,None)
-            
+
         if(rft.Link is not None):
             for i in range (0,numOfLinks):
                 if( '@odata.id'  not in coll['Members'][i] ):
@@ -865,7 +868,7 @@ class RfTransport():
                     path=coll['Members'][i]['@odata.id']
                     if( path == rft.Link ):
                         return(path,0,None,False,None)
-                    
+
             #if we get here, there was no link in Members array that matched -L <link>
             rft.printErr("Error: getPathBy --Link option: none of the links in the collection matched -L<link>")
             return(None,1,None,False,None)
@@ -884,7 +887,7 @@ class RfTransport():
             if( '@odata.id'  not in coll['Members'][0] ):
                 rft.printErr("Error: getPathBy --First option: improper formatted link-no @odata.id")
                 return(None,1,None,False,None)
-            else:   
+            else:
                 return(coll['Members'][0]['@odata.id'],0,None,False,None)
 
         elif(rft.gotMatchOptn):
@@ -936,7 +939,7 @@ class RfTransport():
             if( numOfLinks == 0 ):
                 rft.printErr("Error: getPathBy2: empty members array")
                 return(None,1,None,False,None)
-            
+
         if(rft.linkLevel2 is not None):
             for i in range (0,numOfLinks):
                 if( '@odata.id'  not in coll['Members'][i] ):
@@ -946,7 +949,7 @@ class RfTransport():
                     path=coll['Members'][i]['@odata.id']
                     if( path == rft.linkLevel2 ):
                         return(path,0,None,False,None)
-                    
+
             #if we get here, there was no link in Members array that matched -L <link>
             rft.printErr("Error: getPathBy --Link option: none of the links in the collection matched -L<link>")
             return(None,1,None,False,None)
@@ -1015,7 +1018,7 @@ class RfTransport():
                     listMember={"Id": d["Id"], "@odata.id": d["@odata.id"] }
                     # if a property was specified to include, add it to the list dict
                     if( prop is not None ):
-                        listMember[prop]=propVal           
+                        listMember[prop]=propVal
                     # add the member to the listd
                     members.append(listMember)
 
@@ -1059,7 +1062,7 @@ class RfTransport():
 
         #update base list dictionary
         coll["Members"]=expandedMembers
-           
+
         return(rc,r,j,coll)
 
 
@@ -1071,8 +1074,8 @@ class RfTransport():
         if(r is  None):
             rft.printErr("Transport:Patch: resource Get response is None")
             return(4,None,False,None)
-        
-        #output the patch data in json to send over the network   
+
+        #output the patch data in json to send over the network
         reqPatchData=json.dumps(patchData)
 
         # check if an etag was in response header, and extract the etag value if there
@@ -1101,7 +1104,7 @@ class RfTransport():
                                         headersInput=patchHeaders, reqData=reqPatchData)
         # if response was good but no data retured (status_Code=204), then do another GET to get the response
         if(rc==0):
-            if(r.status_code==204):  #no data returned, get the response   
+            if(r.status_code==204):  #no data returned, get the response
                 # if the getResponseAfterPatch was set False, dont get a response
                 # this is used by change password to not execute after changing password since the
                 if getResponseAfterPatch is True:
@@ -1115,7 +1118,7 @@ class RfTransport():
             elif( (r.status_code==200) and (not "@odata.id" in d)):
                 rc,r,j,d=rft.rftSendRecvRequest(rft.AUTHENTICATED_API, 'GET', r.url )
                 if( rc != 0):  return(rc,r,False,None)
-        return(rc,r,j,d) 
+        return(rc,r,j,d)
 
 
 
@@ -1128,9 +1131,9 @@ class RfTransport():
             return(None,None,None)
 
         resourceOdataType=resource["@odata.type"]
-    
-        #the odataType format is:  <namespace>.<version>.<type>   where version may have periods in it 
-        odataTypeMatch = re.compile('^#([a-zA-Z0-9]*)\.([a-zA-Z0-9\._]*)\.([a-zA-Z0-9]*)$')  
+
+        #the odataType format is:  <namespace>.<version>.<type>   where version may have periods in it
+        odataTypeMatch = re.compile('^#([a-zA-Z0-9]*)\.([a-zA-Z0-9\._]*)\.([a-zA-Z0-9]*)$')
         resourceMatch = re.match(odataTypeMatch, resourceOdataType)
         if(resourceMatch is None):
             # try with no version component
@@ -1147,12 +1150,12 @@ class RfTransport():
             namespace=resourceMatch.group(1)
             version=resourceMatch.group(2)
             resourceType=resourceMatch.group(3)
-    
+
         return(namespace, version, resourceType)
 
 
 
-        
+
 '''
 TODO:
 1.

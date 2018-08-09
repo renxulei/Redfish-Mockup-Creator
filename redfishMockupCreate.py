@@ -59,6 +59,7 @@ def displayOptions(rft):
     print("   -T,              --Time               -- Time mode. Retrieval time of each GET will be captured")
     print("   -S,              --Secure             -- use HTTPS for all gets.   otherwise HTTP is used")
     print("   -u <user>,       --user=<usernm>      -- username used for remote redfish authentication")
+    print("   -L <int>,        --Limit=<int>        -- limit of nextLink to follow")
     print("   -p <passwd>,     --password=<passwd>  -- password used for remote redfish authentication")
     print("   -r <rhost>,      --rhost=<rhost>      -- remote redfish service hostname or IP:port")
     print("   -A <Auth>,       --Auth=<auth>        -- auth method ot use: None, Basic(dflt), Session ")
@@ -184,13 +185,14 @@ def main(argv):
     addCopyright = None
     addHeaders = False
     addTime = False
+    getLimit = 10
     scrapeMetadata = False
     # Exception List required given Dell 13g iDRAC does not include odata.type with expanded Log
     exceptionList = ['iDRAC.Embedded.1/Logs/']
 
     try:
-        opts, args = getopt.gnu_getopt(argv[1:], "VhvqMSHTu:p:r:A:C:D:d:",
-                                       ["Version", "help", "quiet", "ScrapeMetadata", "Secure=",
+        opts, args = getopt.gnu_getopt(argv[1:], "VhvqMSHTL:u:p:r:A:C:D:d:",
+                                       ["Version", "help", "quiet", "ScrapeMetadata", "Secure=", "Limit=",
                                         "user=", "password=", "rhost=", "Auth=",
                                         "custom", "Copyright=", "Headers", "Time", "Dir=, description=]"])
     except getopt.GetoptError:
@@ -229,6 +231,9 @@ def main(argv):
             addCopyright = arg
         elif opt in ("-H", "--Headers"):
             addHeaders = True
+        elif opt in ("-L", "--Limit"):
+            getLimit = int(arg)
+            rft.MaxNextLinks = getLimit
         elif opt in ("-M", "--ScrapeMetadata"):
             scrapeMetadata = True
         elif opt in ("-T", "--Time"):
@@ -280,28 +285,17 @@ def main(argv):
         sys.exit(1)
 
     # If directory was specified, check and create; Otherwise do the same the default directory
-    if mockDirPath is not None:
-        mockDir = os.path.realpath(mockDirPath)
-        #  If the dir exists and non-empty fail
-        if os.path.isdir(mockDir) and os.listdir(mockDir):
-            rft.printErr(
-                "ERROR: Directory not empty...faint-heartedly refusing to create mockup")
-            sys.exit(1)
-        # Else create it or fail
-        elif(rfMakeDir(rft, mockDir) is False):
-            rft.printErr("ERROR: cant create /redfish directory. aborting")
-            sys.exit(1)
-    else:
-        # Directory created is "MockCrDfltDir"
-        mockDirPath = os.path.join(os.getcwd(), defaultDir)
-        mockDir = os.path.realpath(mockDirPath)
-        if os.path.isdir(mockDir) and os.listdir(mockDir):
-            rft.printErr(
-                "ERROR: Directory not empty...faint-heartedly refusing to create mockup")
-            sys.exit(1)
-        elif(rfMakeDir(rft, mockDir) is False):
-            rft.printErr("ERROR: cant create /redfish directory. aborting")
-            sys.exit(1)
+    mockDirPath = os.path.join(os.getcwd(), defaultDir) if mockDirPath is None else mockDirPath
+    mockDir = os.path.realpath(mockDirPath)
+    #  If the dir exists and non-empty fail
+    if os.path.isdir(mockDir) and os.listdir(mockDir):
+        rft.printErr(
+            "ERROR: Directory not empty...faint-heartedly refusing to create mockup")
+        sys.exit(1)
+    # Else create it or fail
+    elif(rfMakeDir(rft, mockDir) is False):
+        rft.printErr("ERROR: cant create /redfish directory. aborting")
+        sys.exit(1)
 
     # print out rhost and directory path
     rft.printVerbose(1, "rhost: {}".format(rft.rhost))
@@ -708,9 +702,8 @@ def readResourceMkdirCreateIndxFile(rft, rootUrl, mockDir, link, addCopyright, a
         relPath = absPath
 
     # read the resource.
-
-    rc, r, j, d = rft.rftSendRecvRequest(
-        rft.AUTHENTICATED_API, 'GET', rootUrl, relPath=absPath, jsonData=jsonData)
+    retval = rft.rftSendRecvRequest(rft.AUTHENTICATED_API, 'GET', rootUrl, relPath=absPath, jsonData=jsonData)
+    rc, r, j, d = retval if retval is not None else (1, None, False, None)
     if(rc != 0):
         rft.printErr(
             "ERROR:readResourceMkdirCreateIndxFile: Error reading resource: link:{}".format(link))
