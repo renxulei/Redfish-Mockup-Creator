@@ -1,0 +1,207 @@
+<!-- 
+Copyright Notice:
+Copyright 2019 Lenovo. All rights reserved.
+License: Apache License. For full text see link: https://github.com/renxulei/Redfish-Mockup-Creator/blob/master/APACHE_LICENSE
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{title}}</title>
+    <link rel="stylesheet" href="http://fw.core.lenovo.com/static/css/bootstrap.min.css">
+    <link rel="stylesheet" href="http://fw.core.lenovo.com/static/css/bootstrap-sortable.css">
+    <style>
+        th.tiny-col {
+            width: 2rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" ng-app="app" ng-controller="mainCtrl as $ctrl">
+        <h3 class="page-header">{{title}}</h3>
+        <div class="alert alert-info">
+            <p><a href="https://{{HostIP}}" target="_blank">HostIP:{{HostIP}}</a>&nbsp;&nbsp;&nbsp;&nbsp;AverageTime:{{AverageTime}}&nbsp;&nbsp;&nbsp;&nbsp;TotalTime:{{TotalTime}}</p>
+        </div>
+        <div id="chart" style="width: 100%; height: 480px"></div>
+        <div class="row">
+            <div class="col-md-12 col-xs-12">            
+                <div class="table-responsive" ng-cloak>
+                  <table class="table table-hover sortable">
+                    <thead>
+                      <tr>
+                        <th class="tiny-col"></th>
+                        <th>Resource/URI</th>
+                        <th>Time(ms)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr ng-repeat="item in $ctrl.data.rows" ng-class="{'danger': item.min == 0}">
+                        <td>[[ $index + 1]]</td>
+                        <td>[[ item.url ]]</td>
+                        <td>[[ item.time ]]</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</table>
+<script src="http://fw.core.lenovo.com/static/js/jquery.min.js"></script>
+<script src="http://fw.core.lenovo.com/static/js/angular.min.js"></script>
+<script src="http://fw.core.lenovo.com/static/js/bootstrap.min.js"></script>
+<script src="http://fw.core.lenovo.com/static/js/bootstrap-select.js"></script>
+<script src="http://fw.core.lenovo.com/static/js/bootstrap-sortable.js"></script>
+<script src="http://fw.core.lenovo.com/static/js/echarts.min.js"></script>
+<script>
+    angular.module("app", [])
+    .config(['$interpolateProvider', function($interpolateProvider) {
+        $interpolateProvider.startSymbol('[[');
+        $interpolateProvider.endSymbol(']]');
+    }])
+    .config(['$compileProvider', function($compileProvider){//配置这段代码即可
+    //注:有些版本的angularjs为$compileProvider.urlSanitizationWhitelist(/^\s*(https?|ftp|mailto|file|javascript):/);,两种都试一下可以即可
+      $compileProvider.aHrefSanitizationWhitelist(/^\s*(https?|ftp|mailto|file|javascript):/);
+    }])
+    .filter('arrayMax', function(){
+        return function arrayMax(array, n) {
+              var ret = array.reduce(function(a, b) {
+                return Math.max(a, b);
+              });
+              return parseInt(ret * ( n || 1));
+          }
+    })
+    .filter('arrayMin', function(){
+        return function arrayMin(array, n) {
+              var ret = array.reduce(function(a, b) {
+                return Math.min(a, b);
+              });
+              return parseInt(ret * ( n || 1));
+          }
+    })
+    .filter('arrayAverage', function(){
+        return function arrayAverage(array, n) {
+              var avg = array.reduce(function(a, b) {
+                return a + b;
+              }) / array.length;
+              return parseInt(avg * (n || 1));
+          }
+    })
+    .value("jsondata",{{jsondata}})
+    .controller('mainCtrl', function($scope, jsondata){
+        this.data = jsondata;
+        this.getRounds = function(arr){
+            var text = '';
+            arr.forEach(function(e){
+                text += parseInt(e * 1000) + ' ';
+            })
+            return text;
+        }
+        function initPerfSeries(charts_data) {
+            // 
+            var ret = [];
+            charts_data.legend.forEach(function(val) {
+              one = {
+                  name: val,
+                  type: charts_data.types[val],
+                  data: charts_data.series[val],
+              }
+              if (val == "max") {
+                one.barGap = "-30%";
+                one.zlevel = 1;
+              }
+              one.itemStyle = {
+                    normal: {
+                        color: charts_data.colors[val],
+                        label: {
+                            show: true,
+                            position: 'top',
+                            formatter: function(c) {
+                                return c.data == 0 ? '' : c.data
+                            }
+                        }
+                    }
+                }
+                ret.push(one)
+            })
+            return ret;
+        }
+        function do_set_redfish_perf(charts_data, canvasId) {
+            var panel = document.getElementById(canvasId);
+            if (panel == undefined) return;
+            var myChart = echarts.init(panel);
+            // var h = $(panel).height();
+            // $(panel).height(20 * charts_data.assignee.cols.length);
+            var option = {
+                title: {
+                    text: 'Elasped Time',
+                    textStyle: {
+                        //文字颜色
+                        color: 'black',
+                        //字体风格,'normal','italic','oblique'
+                        fontStyle: 'normal',
+                        //字体粗细 'normal','bold','bolder','lighter',100 | 200 | 300 | 400...
+                        fontWeight: 'bold',
+                        //字体系列
+                        fontFamily: 'sans-serif',
+                        //字体大小
+                        fontSize: 20
+                    }
+                },
+                tooltip : {
+                    trigger: 'axis',
+                    axisPointer : {            // 坐标轴指示器，坐标轴触发有效
+                        type : 'shadow'        // 默认为直线，可选为：'line' | 'shadow'
+                    }
+                },
+                legend: {
+                    data: charts_data.legend,
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '30%',
+                    containLabel: true
+                },
+                xAxis:  {
+                    type: 'category',
+                    data: charts_data.xAxis,
+                    axisLabel:{
+                        interval: 0 ,
+                        rotate:20,
+                        fontSize: 10
+                    }
+
+                },
+                yAxis: {
+                    type: 'value',
+                    minInterval: 1,
+                    // max: 100,
+                    axisLabel: {
+                        formatter: function(val) {
+                                return val + ' (ms)';
+                            }
+                            // formatter: '{value} %'
+                    },
+                    
+                },
+                dataZoom : {
+                    show : true,
+                    realtime : true,
+					startValue:0,                           //数据窗口范围的起始数值
+					endValue:20, 
+                    // start : 0,
+                    // orient: 'horizontal',
+                    // end : 5
+                },
+            };
+            option['series'] = initPerfSeries(charts_data)
+            myChart.setOption(option);
+        }
+        do_set_redfish_perf(this.data, 'chart')
+    })
+</script>
+</body>
+</html>
