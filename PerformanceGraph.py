@@ -14,48 +14,51 @@ import redfishMockupCreate
 from datetime import datetime
 
 curdir = os.path.dirname(__file__)
-logdir = os.path.join(curdir, 'PerformanceGraphLogs/')
+logdir = os.path.join(curdir, 'PerformanceGraphLogs' + os.sep)
 if not (os.path.exists(logdir)):
     os.mkdir(logdir)
 
 log_file = os.path.join(logdir, "output.log")
 
+
 def GenerateTimeDict(MockupPath, TimeDict):
 
     odataid = time = ""
-
     # recusive go through all directories under mockup folder
     MockupPathDirFile = os.listdir(MockupPath)
     for DirFileElem in MockupPathDirFile:
         DirFilePath = os.path.join(MockupPath, DirFileElem)
         logging.info("Processing directory :" + DirFilePath)
         if(os.path.isdir(DirFilePath)):
-            DirFilePathList = DirFilePath.split("\\")
+            DirFilePathList = DirFilePath.split(os.sep)
             CurrentParentName = DirFilePathList[-1]
             # skip the first redfish v1/
             if(CurrentParentName == "redfish"):
                 GenerateTimeDict(DirFilePath, TimeDict)
                 logging.debug("Skip redfish directory without actual result")
             else:
-                if(os.path.exists(DirFilePath + "\\index.json") and os.path.exists(DirFilePath + "\\time.json")):
+                if(os.path.exists(DirFilePath + os.sep + "index.json") and os.path.exists(DirFilePath + os.sep + "time.json")):
                     try:
-                        with open(DirFilePath + "\\index.json", "r") as f:
+                        with open(DirFilePath + os.sep + "index.json", "r") as f:
                             try:
                                 fcontent = json.load(f)
-                                odataid = fcontent["@odata.id"]
-                                if (isinstance(odataid, dict)):
-                                    logging.debug("Dict type odataid found")
-                                    odataid = fcontent["@odata.id"]["1"]["@odata.id"][:-2]
-                            except ValueError:
+                                if "@odata.id" in fcontent.keys():
+                                    odataid = fcontent["@odata.id"]
+                                    if (isinstance(odataid, dict)):
+                                        logging.debug("Dict type odataid found")
+                                        odataid = fcontent["@odata.id"]["1"]["@odata.id"][:-2]
+                                else:
+                                        odataid = ''
+                            except Exception:
                                 logging.error("Fail to read odataid under " + DirFilePath + ", Generate time dictionary failed")
                                 sys.exit(-1)
                             finally:
                                 f.close()
-                        with open(DirFilePath + "\\time.json", "r") as f:
+                        with open(DirFilePath + os.sep + "time.json", "r") as f:
                             try:
                                 fcontent = json.load(f)
                                 time = fcontent["GET_Time"]
-                            except ValueError:
+                            except Exception:
                                 logging.error("Fail to read time under " + DirFilePath + ", Generate time dictionary failed")
                                 sys.exit(-1)
                             finally:
@@ -65,8 +68,9 @@ def GenerateTimeDict(MockupPath, TimeDict):
                         sys.exit(-1)
                 else:
                     logging.warning("Index.json or time.json doesn't exist under " + DirFilePath + ", Skip this directory")
-                        
-                TimeDict[odataid] = time
+                
+                if odataid != '':
+                    TimeDict[odataid] = time
                 GenerateTimeDict(DirFilePath, TimeDict)
 
         else:
@@ -78,9 +82,9 @@ def GetReadmeData(MockupPath):
 
     rhost = averageResponseTime = totalResponseTime = ""
 
-    if(os.path.exists(MockupPath + "\\README")):
+    if(os.path.exists(MockupPath + os.sep + "README")):
         try:
-            with open(MockupPath + "\\README", "r") as f:
+            with open(MockupPath + os.sep + "README", "r") as f:
                 try:
                     contents = f.readlines()
                     for line in contents:
@@ -150,9 +154,9 @@ def GeneratePerformanceGraph(TimeDict, HostIP, AverageTime, TotalTime, ExceptAve
         ).replace('{{HostIP}}', HostIP).replace('{{AverageTime}}', AverageTime).replace('{{TotalTime}}', TotalTime)
 
     if (ExceptAverage[0] < (float(AverageTime[:-4]))):
-        print("Average time beyond expect, mockup data result FAIL the test")
+        print("Performance test: *** FAIL ***, average time is beyond expect")
     else:
-        print("Average time within expect, mockup data result PASS the test")
+        print("Performance test: *** PASS ***, average time is within expect")
     print("Expect average time: %f" %(ExceptAverage[0]))
     print("Actual average time: %f" %(float(AverageTime[:-4])))
 
@@ -168,7 +172,7 @@ def GeneratePerformanceGraph(TimeDict, HostIP, AverageTime, TotalTime, ExceptAve
 
     
 def main():
-    
+    result= {}
     TimeDict= {}
 
     mkparser = argparse.ArgumentParser(description='Tool for generate performancegraph from mockup data.')
@@ -215,7 +219,8 @@ def main():
         MockupPath =  args.Dir
     else:
         logging.error("Mockup file directory doesn't exist")
-        return False
+        result = {'ret': False, 'msg': "Mockup file directory doesn't exist"}
+        return result
     
     print("Generating time dictionary from mockup data ...")
     TimeDict = GenerateTimeDict(MockupPath, TimeDict)
@@ -224,17 +229,20 @@ def main():
     HostIP, AverageTime, TotalTime, = GetReadmeData(MockupPath)
     if (HostIP == "" or AverageTime == "" or TotalTime ==""):
         logging.error("Get data from README file failed")
-        return False
- 
+        result = {'ret': False, 'msg': "Get data from README file failed"}
+        return result
+    result = {'ret': True, 'HostIP': HostIP, 'AverageTime': AverageTime, 'TotalTime': TotalTime}
+
     print("Generating PerformanceGraph ...")
     ret = GeneratePerformanceGraph(TimeDict, HostIP, AverageTime, TotalTime, args.ExceptAverage)
     if (ret != False):
-        print("Please check result page under " + ret + " and output.log under " + logdir)
+        print("Please check detailed performance results under " + ret + " and running logs under " + logdir + "output.log")
     else:
+        print("Generating PerformanceGraph failed")
         logging.error("Generating PerformanceGraph failed")
-        return False
 
     logging.info("Tool exit at " + datetime.now().strftime('%Y%m%d%H%M%S'))
+    return result
 
     
 if __name__ == "__main__":
