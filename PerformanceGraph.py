@@ -109,7 +109,7 @@ def GetReadmeData(MockupPath):
     return rhost, averageResponseTime, totalResponseTime
 
 
-def GeneratePerformanceGraph(TimeDict, HostIP, AverageTime, TotalTime, ExceptAverage):
+def GeneratePerformanceGraph(TimeDict, HostIP, AverageTime, TotalTime, ExpectAverage):
 
     chart_data = {
 
@@ -153,11 +153,11 @@ def GeneratePerformanceGraph(TimeDict, HostIP, AverageTime, TotalTime, ExceptAve
     templateHtml = templateHtml.replace("{{title}}", "Redfish Performance Test Result %s" % timestamp
         ).replace('{{HostIP}}', HostIP).replace('{{AverageTime}}', AverageTime).replace('{{TotalTime}}', TotalTime)
 
-    if (ExceptAverage[0] < (float(AverageTime[:-4]))):
+    if (ExpectAverage[0] < (float(AverageTime[:-4]))):
         print("Performance test: *** FAIL ***, average time is beyond expect")
     else:
         print("Performance test: *** PASS ***, average time is within expect")
-    print("Expect average time: %f" %(ExceptAverage[0]))
+    print("Expect average time: %f" %(ExpectAverage[0]))
     print("Actual average time: %f" %(float(AverageTime[:-4])))
 
     try:
@@ -178,7 +178,7 @@ def main():
     mkparser = argparse.ArgumentParser(description='Tool for generate performancegraph from mockup data.')
 
     mkparser.add_argument('--dir', type=str, required=True, help='directory of mockup creator data', dest="Dir")
-    mkparser.add_argument('--expect', type=float, required=True, nargs=1, help='expect average response time', dest="ExceptAverage")
+    mkparser.add_argument('--expect', type=float, required=True, nargs=1, help='expect average response time', dest="ExpectAverage")
 
     mkparser.add_argument("use_mockup", nargs='?', choices=["mockupargs"], help="command name")
     mkparser.add_argument("mockup_args", nargs=argparse.REMAINDER, help=argparse.SUPPRESS) 
@@ -231,10 +231,12 @@ def main():
         logging.error("Get data from README file failed")
         result = {'ret': False, 'msg': "Get data from README file failed"}
         return result
-    result = {'ret': True, 'HostIP': HostIP, 'AverageTime': AverageTime, 'TotalTime': TotalTime}
+    result = {'ret': True, 'HostIP': HostIP, 'AverageTime': float(AverageTime[:-4]), 'TotalTime': float(TotalTime[:-4]), 'logdir': logdir}
+    if float(AverageTime[:-4]) > args.ExpectAverage[0]:
+        result['ret'] = False
 
     print("Generating PerformanceGraph ...")
-    ret = GeneratePerformanceGraph(TimeDict, HostIP, AverageTime, TotalTime, args.ExceptAverage)
+    ret = GeneratePerformanceGraph(TimeDict, HostIP, AverageTime, TotalTime, args.ExpectAverage)
     if (ret != False):
         print("Please check detailed performance results under " + ret + " and running logs under " + logdir + "output.log")
     else:
