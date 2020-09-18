@@ -231,6 +231,7 @@ def main():
         logging.error("Get data from README file failed")
         result = {'ret': False, 'msg': "Get data from README file failed"}
         return result
+    logdir = os.path.join(args.Dir, 'PerformanceGraphLogs'+os.sep)
     result = {'ret': True, 'HostIP': HostIP, 'AverageTime': float(AverageTime[:-4]), 'TotalTime': float(TotalTime[:-4]), 'logdir': logdir}
     if float(AverageTime[:-4]) > args.ExpectAverage[0]:
         result['ret'] = False
@@ -238,12 +239,14 @@ def main():
     print("Generating PerformanceGraph ...")
     ret = GeneratePerformanceGraph(TimeDict, HostIP, AverageTime, TotalTime, args.ExpectAverage)
     if (ret != False):
+        ret = os.path.join(args.Dir, 'PerformanceGraphLogs', os.path.split(ret)[-1])
         print("Please check detailed performance results under " + ret + " and running logs under " + logdir + "output.log")
     else:
         print("Generating PerformanceGraph failed")
         logging.error("Generating PerformanceGraph failed")
 
     logging.info("Tool exit at " + datetime.now().strftime('%Y%m%d%H%M%S'))
+    logging.shutdown()
     return result
 
     
